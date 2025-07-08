@@ -1,27 +1,30 @@
 # scripts/format_disks.ps1
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
 
+# give Windows time to see the disks
 Start-Sleep -Seconds 30
 
-# Process RAW disks
-Get-Disk |
-  Where-Object PartitionStyle -Eq 'RAW' |
-  ForEach-Object {
-    $diskNumber = $_.Number
+# define the letters you want
+$letters = @('D','E')
 
-    Initialize-Disk -Number $diskNumber -PartitionStyle MBR
+# grab all uninitialized disks (skip disk 0)
+$rawDisks = Get-Disk | Where-Object PartitionStyle -Eq 'RAW'
 
-    # Create one full-size partition
-    $partition = New-Partition `
-      -DiskNumber $diskNumber `
-      -UseMaximumSize `
-      -DriveLetter (($diskNumber == 1) ? 'D' : 'E')  # map disk 1->D, disk 2->E
+for ($i = 0; $i -lt $rawDisks.Count; $i++) {
+  $disk = $rawDisks[$i]
+  $letter = $letters[$i]
 
-    # Format with label “my drive D” or “my drive E”
-    $label = "my drive " + $partition.DriveLetter
-    Format-Volume `
-      -Partition $partition `
-      -FileSystem NTFS `
-      -NewFileSystemLabel $label `
-      -Confirm:$false
-  }
+  # initialize, partition, assign drive letter
+  Initialize-Disk -Number $disk.Number -PartitionStyle MBR
+  $part = New-Partition `
+    -DiskNumber $disk.Number `
+    -UseMaximumSize `
+    -DriveLetter $letter
+
+  # format with your custom label
+  Format-Volume `
+    -Partition $part `
+    -FileSystem NTFS `
+    -NewFileSystemLabel "my drive $letter" `
+    -Confirm:$false
+}
