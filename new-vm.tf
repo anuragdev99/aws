@@ -23,4 +23,3 @@ resource "aws_instance" "vm2" {
     Name = "my-vm2"
   }
 }
-
