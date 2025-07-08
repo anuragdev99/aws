@@ -4,7 +4,7 @@ name: Plan and Apply Terraform
 on:
   push:
     branches:
-      - main  ####### Trigger only on push to main branch
+      - main  ######## Trigger only on push to main branch
   workflow_dispatch:  # Allow manual trigger
 
 
