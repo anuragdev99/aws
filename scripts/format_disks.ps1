@@ -1,18 +1,27 @@
-# format_disks.ps1
-# -----------------
-# Run under PowerShell with -File.
-
+# scripts/format_disks.ps1
 $ErrorActionPreference = "Stop"
 
-# Wait for the OS to see the new disks
 Start-Sleep -Seconds 30
 
-# Find all uninitialized (RAW) disks, init, partition, assign letter, and format
+# Process RAW disks
 Get-Disk |
   Where-Object PartitionStyle -Eq 'RAW' |
   ForEach-Object {
-    Initialize-Disk -Number $_.Number -PartitionStyle MBR
-    $partition = New-Partition -DiskNumber $_.Number -UseMaximumSize -AssignDriveLetter
-    Format-Volume -Partition $partition -FileSystem NTFS `
-      -NewFileSystemLabel "DataDisk$($_.Number)" -Confirm:$false
+    $diskNumber = $_.Number
+
+    Initialize-Disk -Number $diskNumber -PartitionStyle MBR
+
+    # Create one full-size partition
+    $partition = New-Partition `
+      -DiskNumber $diskNumber `
+      -UseMaximumSize `
+      -DriveLetter (($diskNumber == 1) ? 'D' : 'E')  # map disk 1->D, disk 2->E
+
+    # Format with label “my drive D” or “my drive E”
+    $label = "my drive " + $partition.DriveLetter
+    Format-Volume `
+      -Partition $partition `
+      -FileSystem NTFS `
+      -NewFileSystemLabel $label `
+      -Confirm:$false
   }
