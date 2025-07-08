@@ -85,7 +85,7 @@ jobs:
             const collapsedDetails = `<details>\n<summary>Show Plan Details</summary>\n\n\u0060\u0060\u0060hcl\n${planOutput.slice(0, 60000)}\n\u0060\u0060\u0060\n</details>`;
             const meta = `\n\nPusher: @${context.actor}, Branch: \`${context.ref.replace('refs/heads/', '')}\`, Workflow: \`${context.workflow}\``;
             const body = [
-              "## Terraform Plan Summary",
+              "### Terraform Plan Summary",
               summary,
               collapsedDetails,
               meta
