@@ -1,7 +1,7 @@
 # remote_exec.tf
 
 resource "null_resource" "format_windows_disks" {
-  # Trigger re-provisioning when the attached volume IDs change
+  # Re-run formatting whenever the volume IDs change
   triggers = {
     volume_ids = join(",", aws_ebs_volume.data_volume[*].id)
   }
@@ -18,12 +18,18 @@ resource "null_resource" "format_windows_disks" {
       insecure = true     # allow unencrypted Basic auth
     }
 
+    # ⇩ Tell Terraform to use PowerShell for the inline commands ⇩
+    shell = ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"]
+
     inline = [
+      # Give Windows a moment to discover the new disks
       "Start-Sleep -Seconds 30",
-      "Get-Disk | Where PartitionStyle -Eq 'RAW' | ForEach-Object {",
+
+      # Initialize all RAW disks, create a single partition, assign a letter, then format NTFS
+      "Get-Disk | Where-Object PartitionStyle -Eq 'RAW' | ForEach-Object {",
       "  Initialize-Disk -Number $_.Number -PartitionStyle MBR",
       "  $p = New-Partition -DiskNumber $_.Number -UseMaximumSize -AssignDriveLetter",
-      "  Format-Volume -Partition $p -FileSystem NTFS -Confirm:$false",
+      "  Format-Volume -Partition $p -FileSystem NTFS -NewFileSystemLabel DataDisk -Confirm:$false",
       "}"
     ]
   }
