@@ -6,6 +6,19 @@ resource "aws_instance" "vm1" {
   key_name                    = "my-newkey2025"
   associate_public_ip_address = true
 
+  user_data = <<-EOF
+    <powershell>
+    net user Administrator "Password@@2025##"
+    winrm quickconfig -force
+    winrm set winrm/config/service @{AllowUnencrypted="true"}
+    winrm set winrm/config/service/auth @{Basic="true"}
+    Set-Item -Path WSMan:\\localhost\\Service\\AllowUnencrypted -Value $true
+    Set-Item -Path WSMan:\\localhost\\Service\\Auth\\Basic -Value $true
+    Enable-PSRemoting -Force
+    New-NetFirewallRule -Name "WinRM-HTTP" -DisplayName "Allow WinRM over HTTP" -Protocol TCP -LocalPort 5985 -Action Allow
+    </powershell>
+  EOF
+
   tags = {
     Name = "my-vm1"
   }
