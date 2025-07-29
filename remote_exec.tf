@@ -17,14 +17,14 @@ resource "null_resource" "format_windows_disks" {
     insecure = true
   }
 
-  # Step 1: Upload PowerShell script
+/*  # Step 1: Upload PowerShell script
   provisioner "file" {
     source      = "${path.module}/scripts/format_disks.ps1"
     destination = "C:/Windows/Temp/format_disks.ps1"
   }
 
   # Step 2: Run the script
-/*  provisioner "remote-exec" {
+  provisioner "remote-exec" {
     inline = [
       "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\\Windows\\Temp\\format_disks.ps1"
     ]
