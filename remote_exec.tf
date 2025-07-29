@@ -24,10 +24,16 @@ resource "null_resource" "format_windows_disks" {
   }
 
   # Step 2: Run the script
+/*  provisioner "remote-exec" {
+    inline = [
+      "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\\Windows\\Temp\\format_disks.ps1"
+    ]
+  }
+*/
+
   provisioner "remote-exec" {
     inline = [
-      # ✔ Added double backslashes for better path handling on Windows
-      "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\\Windows\\Temp\\format_disks.ps1"
+      "Write-Output 'WinRM is working!' > C:\\Windows\\Temp\\winrm_test.txt"
     ]
   }
 
