@@ -11,6 +11,7 @@ resource "null_resource" "format_windows_disks" {
     port     = 5985
     user     = "Administrator"
     password = "Password@@2025##"
+    timeout  = "5m"
     https    = false
     insecure = true
   }
