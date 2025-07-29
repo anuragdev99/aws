@@ -1,12 +1,19 @@
 name: 🚀 Plan and Apply Terraform
 
-
 on:
  # push:
  #   branches:
  #     - main  ######## Trigger only on push to main branch
   workflow_dispatch:  # Allow manual trigger
-
+    inputs:
+      action:
+        description: 'Choose Terraform action'
+        required: true
+        default: 'apply'
+        type: choice
+        options:
+          - apply
+          - destroy
 
 jobs:
   terraform:
@@ -103,6 +110,14 @@ jobs:
       #     echo "❌ Terraform plan failed with exit code 1"
       #     exit 1
 
+      # - name: Terraform Apply
+      #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      #   run: terraform destroy -auto-approve
+
       - name: Terraform Apply
-        # if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event.inputs.action == 'apply'
+        run: terraform apply -auto-approve
+
+      - name: Terraform Destroy
+        if: github.event.inputs.action == 'destroy'
         run: terraform destroy -auto-approve
