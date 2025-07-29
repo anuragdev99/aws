@@ -10,7 +10,7 @@ resource "null_resource" "format_windows_disks" {
     host     = aws_instance.vm1.public_ip
     port     = 5985
     user     = "Administrator"
-    password = "f?Idwm3?9M)76@u3lMXLDhHLNGsJYaB?"
+    password = "P@ssw0rd@@2025##"
     https    = false
     insecure = true
   }
