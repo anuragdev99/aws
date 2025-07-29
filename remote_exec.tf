@@ -15,7 +15,6 @@ resource "null_resource" "format_windows_disks" {
     timeout  = "10m"
     https    = false
     insecure = true
-    ntlm     = true
   }
 
 /*  # Step 1: Upload PowerShell script
