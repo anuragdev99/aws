@@ -1,5 +1,6 @@
 resource "aws_instance" "vm1" {
-  ami                         = "ami-0ed9f8d63c9e8b95a"
+ # ami                         = "ami-0ed9f8d63c9e8b95a"
+  ami                         = "ami-0758218dcb57e4a14"
   instance_type               = "t2.micro"
   subnet_id                   = "subnet-0e09b359f12239236"
   vpc_security_group_ids      = ["sg-0e2fe4c52772a7b26"]
@@ -47,7 +48,8 @@ EOF
 }
 
 resource "aws_instance" "vm2" {
-  ami                         = "ami-0ed9f8d63c9e8b95a"
+#  ami                         = "ami-0ed9f8d63c9e8b95a"
+  ami                         = "ami-0758218dcb57e4a14"
   instance_type               = "t2.micro"
   subnet_id                   = "subnet-0e09b359f12239236"
   vpc_security_group_ids      = ["sg-0e2fe4c52772a7b26"]
