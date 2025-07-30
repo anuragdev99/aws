@@ -39,21 +39,25 @@ resource "aws_instance" "vm1" {
   }
 }
 
-resource "aws_ssm_document" "format_disks_doc" {
-  name          = "FormatWindowsDisks"
+resource "aws_ssm_document" "format_data_disks" {
+  name          = "FormatDataDisks"
   document_type = "Command"
   content = jsonencode({
     schemaVersion = "2.2",
-    description   = "Format raw disks and assign drive letters",
+    description   = "Format newly attached disks on Windows",
     mainSteps     = [
       {
         action = "aws:runPowerShellScript",
-        name   = "formatDisks",
+        name   = "formatRawDisks",
         inputs = {
           runCommand = [
-            "Write-Output 'Starting disk format...'",
-            "Get-Disk | Where-Object PartitionStyle -Eq 'RAW' | Initialize-Disk -PartitionStyle MBR -PassThru | New-Partition -UseMaximumSize -AssignDriveLetter | Format-Volume -FileSystem NTFS -Confirm:\$false",
-            "Write-Output 'Disks formatted successfully!' > C:\\Windows\\Temp\\format_log.txt"
+            "$rawDisks = Get-Disk | Where-Object PartitionStyle -Eq 'RAW'",
+            "foreach ($disk in $rawDisks) {",
+            "  $partition = Initialize-Disk -Number $disk.Number -PartitionStyle MBR -PassThru |",
+            "               New-Partition -UseMaximumSize -AssignDriveLetter",
+            "  Format-Volume -Partition $partition -FileSystem NTFS -Confirm:$false",
+            "}",
+            "Write-Output 'Disk formatting complete.' > C:\\Windows\\Temp\\disk_format_log.txt"
           ]
         }
       }
