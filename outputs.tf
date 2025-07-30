@@ -1,4 +1,3 @@
-/*
 
 output "vm1_instance_id" {
   description = "The ID of the first EC2 instance (vm1)"
@@ -39,4 +38,3 @@ output "vm2_public_ip" {
   value       = aws_instance.vm2.public_ip
 }
 
-*/
