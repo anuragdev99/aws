@@ -1,4 +1,4 @@
-resource "null_resource" "format_windows_disks" {
+/* resource "null_resource" "format_windows_disks" {
   # Trigger this null resource to re-run when EBS volume IDs or script changes
   triggers = {
     volume_ids = join(",", aws_ebs_volume.data_volume[*].id)
@@ -41,3 +41,4 @@ resource "null_resource" "format_windows_disks" {
     aws_instance.vm1
   ]
 }
+*/
