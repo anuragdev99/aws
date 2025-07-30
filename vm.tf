@@ -83,7 +83,10 @@ resource "aws_ssm_document" "format_data_disks" {
 }
 
 resource "aws_ssm_association" "vm1_disk_format" {
-  name                = aws_ssm_document.format_data_disks.name
-  instance_id         = aws_instance.vm1.id
-  wait_for_success_timeout = "5m"
+  name = aws_ssm_document.format_data_disks.name
+
+  targets {
+    key    = "InstanceIds"
+    values = [aws_instance.vm1.id]
+  }
 }
