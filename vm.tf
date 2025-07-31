@@ -83,12 +83,14 @@ resource "aws_ssm_document" "format_data_disks" {
   })
 }
 
-resource "aws_ssm_association" "vm1_disk_format" {
-  name = aws_ssm_document.format_data_disks.name
+resource "aws_ssm_association" "format_disks" {
+  name = aws_ssm_document.format_disks.name
 
   targets {
     key    = "InstanceIds"
     values = [aws_instance.vm1.id]
   }
+
+  depends_on = [aws_volume_attachment.attach]
 }
 
