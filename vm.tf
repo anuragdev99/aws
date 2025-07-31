@@ -51,7 +51,7 @@ resource "aws_instance" "vm2" {
   }
 }
 
-
+/*
 resource "aws_ssm_document" "format_data_disks" {
   name          = "FormatDataDisks"
   document_type = "Command"
@@ -94,3 +94,4 @@ resource "aws_ssm_association" "format_disks" {
   depends_on = [aws_volume_attachment.attach]
 }
 
+*/
