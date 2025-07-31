@@ -1,4 +1,4 @@
-/*
+
 # Fetch vm1’s Availability Zone
 data "aws_instance" "vm1" {
   instance_id = aws_instance.vm1.id
@@ -25,4 +25,4 @@ resource "aws_volume_attachment" "attach" {
   force_detach = true
 }
 
-*/
+
