@@ -84,7 +84,7 @@ resource "aws_ssm_document" "format_data_disks" {
 }
 
 resource "aws_ssm_association" "format_disks" {
-  name = aws_ssm_document.format_disks.name
+  name = aws_ssm_document.format_data_disks.name
 
   targets {
     key    = "InstanceIds"
