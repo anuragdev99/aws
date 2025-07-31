@@ -14,6 +14,7 @@ output "vm1_availability_zone" {
   value       = aws_instance.vm1.availability_zone
 }
 
+/*
 #####Volume########
 output "data_volume_ids" {
   description = "IDs of the two 1 GiB volumes attached to vm1"
@@ -24,8 +25,7 @@ output "data_volume_devices" {
   description = "Device names as seen by the OS"
   value       = aws_volume_attachment.attach[*].device_name
 }
-
-
+*/
 
 #VM2#####################################################
 output "vm2_instance_id" {
