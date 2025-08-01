@@ -58,27 +58,34 @@ resource "aws_ssm_document" "format_data_disks" {
 
   content = jsonencode({
     schemaVersion = "2.2",
-    description   = "Format newly attached RAW disks on Windows EC2",
+    description   = "Format and prepare attached data disks",
     mainSteps     = [
       {
         action = "aws:runPowerShellScript",
-        name   = "FormatRawDisks",
+        name   = "PrepareDisks",
         inputs = {
           runCommand = [
             "try {",
-            "  $rawDisks = Get-Disk | Where-Object PartitionStyle -eq 'RAW'",
-            "  if ($rawDisks.Count -eq 0) {",
-            "    'No RAW disks found to format.' | Out-File 'C:\\disk_format_log.txt'",
+            "  Start-Sleep -Seconds 30",  // Give time for disks to initialize
+            "  $dataDisks = Get-Disk | Where-Object IsSystem -eq $false",
+            "  if ($dataDisks.Count -eq 0) {",
+            "    'No data disks found.' | Out-File 'C:\\Temp\\disk_format_log.txt'",
             "  } else {",
-            "    foreach ($disk in $rawDisks) {",
-            "      $partition = Initialize-Disk -Number $disk.Number -PartitionStyle MBR -PassThru |",
-            "                   New-Partition -UseMaximumSize -AssignDriveLetter",
-            "      Format-Volume -Partition $partition -FileSystem NTFS -Force -Confirm:$false",
+            "    foreach ($disk in $dataDisks) {",
+            "      if ($disk.OperationalStatus -ne 'Online') {",
+            "        Set-Disk -Number $disk.Number -IsOffline $false",
+            "        Set-Disk -Number $disk.Number -IsReadOnly $false",
+            "      }",
+            "      if ($disk.PartitionStyle -eq 'RAW') {",
+            "        $partition = Initialize-Disk -Number $disk.Number -PartitionStyle MBR -PassThru |",
+            "                     New-Partition -UseMaximumSize -AssignDriveLetter",
+            "        Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel 'sree' -Force -Confirm:$false",
+            "      }",
             "    }",
-            "    'RAW disk(s) formatted successfully.' | Out-File 'C:\\disk_format_log.txt'",
+            "    'Data disks processed successfully.' | Out-File 'C:\\Temp\\disk_format_log.txt'",
             "  }",
             "} catch {",
-            "  'Disk formatting failed: ' + $_ | Out-File 'C:\\disk_format_error_log.txt'",
+            "  'Error during disk processing: ' + $_ | Out-File 'C:\\Temp\\disk_format_error_log.txt'",
             "}"
           ]
         }
