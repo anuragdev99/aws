@@ -94,27 +94,24 @@ resource "aws_ssm_document" "format_data_disks" {
   })
 }
 
-resource "aws_ssm_document" "test_log_write" {
-  name          = "TestLogWrite"
+resource "aws_ssm_document" "test_user_log" {
+  name          = "TestUserLog"
   document_type = "Command"
 
   content = jsonencode({
     schemaVersion = "2.2",
-    description   = "Test writing to C:\\Temp",
+    description   = "Test writing to user profile",
     mainSteps     = [
       {
         action = "aws:runPowerShellScript",
-        name   = "WriteLog",
+        name   = "WriteUserLog",
         inputs = {
           runCommand = [
             "$ErrorActionPreference = 'Stop'",
-            "try {",
-            "  if (-not (Test-Path 'C:\\Temp')) { New-Item -Path 'C:\\Temp' -ItemType Directory -Force }",
-            "  'Hello from SSM!' | Out-File 'C:\\Temp\\ssm_test_log.txt'",
-            "  Write-Output 'Log written successfully.'",
-            "} catch {",
-            "  Write-Output 'Error: ' + $_",
-            "}"
+            "$userProfile = [Environment]::GetFolderPath('MyDocuments')",
+            "$logPath = Join-Path $userProfile 'ssm_user_log.txt'",
+            "'Hello from SSM!' | Out-File $logPath",
+            "Write-Output \"Log written to $logPath\""
           ]
         }
       }
