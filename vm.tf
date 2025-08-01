@@ -94,43 +94,26 @@ resource "aws_ssm_document" "format_data_disks" {
   })
 }
 
-resource "aws_ssm_document" "create_sql_data_folder" {
-  name          = "CreateSQLDataFolder"
+resource "aws_ssm_document" "test_log_write" {
+  name          = "TestLogWrite"
   document_type = "Command"
 
   content = jsonencode({
     schemaVersion = "2.2",
-    description   = "Create SQLData folder in each data disk",
+    description   = "Test writing to C:\\Temp",
     mainSteps     = [
       {
         action = "aws:runPowerShellScript",
-        name   = "CreateSQLFolder",
+        name   = "WriteLog",
         inputs = {
           runCommand = [
-            "$ErrorActionPreference = 'Stop'",  // Make all errors terminating
+            "$ErrorActionPreference = 'Stop'",
             "try {",
-            "  $logPath = 'C:\\Temp\\sql_data_folder_log.txt'",
-            "  $errorPath = 'C:\\Temp\\sql_data_folder_error_log.txt'",
             "  if (-not (Test-Path 'C:\\Temp')) { New-Item -Path 'C:\\Temp' -ItemType Directory -Force }",
-            "  Start-Sleep -Seconds 20",
-            "  $dataDisks = Get-Disk | Where-Object IsSystem -eq $false",
-            "  foreach ($disk in $dataDisks) {",
-            "    $volumes = Get-Volume -DiskNumber $disk.Number | Where-Object { $_.DriveLetter -ne $null -and $_.FileSystem -ne $null }",
-            "    foreach ($volume in $volumes) {",
-            "      $folderPath = \"$($volume.DriveLetter):\\SQLData\"",
-            "      if (-not (Test-Path $folderPath)) {",
-            "        New-Item -Path $folderPath -ItemType Directory -Force | Out-Null",
-            "        \"Created folder at $folderPath\" | Out-File -Append $logPath",
-            "        Write-Output \"Created folder at $folderPath\"",
-            "      } else {",
-            "        \"Folder already exists at $folderPath\" | Out-File -Append $logPath",
-            "        Write-Output \"Folder already exists at $folderPath\"",
-            "      }",
-            "    }",
-            "  }",
+            "  'Hello from SSM!' | Out-File 'C:\\Temp\\ssm_test_log.txt'",
+            "  Write-Output 'Log written successfully.'",
             "} catch {",
-            "  $_ | Out-File $errorPath",
-            "  Write-Output \"Error: $_\"",
+            "  Write-Output 'Error: ' + $_",
             "}"
           ]
         }
