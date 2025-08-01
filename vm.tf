@@ -79,10 +79,13 @@ resource "aws_ssm_document" "format_data_disks" {
             "      if ($disk.PartitionStyle -eq 'RAW') {",
             "        $partition = Initialize-Disk -Number $disk.Number -PartitionStyle MBR -PassThru |",
             "                     New-Partition -UseMaximumSize -AssignDriveLetter",
-            "        Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel 'sree' -Force -Confirm:$false",
+            "        $volume = Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel 'sree' -Force -Confirm:$false",
+            "        $driveLetter = $volume.DriveLetter",
+            "        $sqlDataPath = \"$driveLetter`:\\SQLData\"",
+            "        New-Item -Path $sqlDataPath -ItemType Directory | Out-Null",
             "      }",
             "    }",
-            "    'Data disks processed successfully.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
+            "    'Data disks processed and SQLData folders created successfully.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
             "  }",
             "} catch {",
             "  'Error during disk processing: ' + $_ | Out-File 'C:\\Windows\\Temp\\disk_format_error_log.txt'",
@@ -94,30 +97,6 @@ resource "aws_ssm_document" "format_data_disks" {
   })
 }
 
-resource "aws_ssm_document" "test_user_log" {
-  name          = "TestUserLog"
-  document_type = "Command"
-
-  content = jsonencode({
-    schemaVersion = "2.2",
-    description   = "Test writing to user profile",
-    mainSteps     = [
-      {
-        action = "aws:runPowerShellScript",
-        name   = "WriteUserLog",
-        inputs = {
-          runCommand = [
-            "$ErrorActionPreference = 'Stop'",
-            "$userProfile = [Environment]::GetFolderPath('MyDocuments')",
-            "$logPath = Join-Path $userProfile 'ssm_user_log.txt'",
-            "'Hello from SSM!' | Out-File $logPath",
-            "Write-Output \"Log written to $logPath\""
-          ]
-        }
-      }
-    ]
-  })
-}
 
 resource "aws_ssm_association" "format_disks" {
   name = aws_ssm_document.format_data_disks.name
