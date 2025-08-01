@@ -69,7 +69,7 @@ resource "aws_ssm_document" "format_data_disks" {
             "  Start-Sleep -Seconds 30",  // Give time for disks to initialize
             "  $dataDisks = Get-Disk | Where-Object IsSystem -eq $false",
             "  if ($dataDisks.Count -eq 0) {",
-            "    'No data disks found.' | Out-File 'C:\\Temp\\disk_format_log.txt'",
+            "    'No data disks found.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
             "  } else {",
             "    foreach ($disk in $dataDisks) {",
             "      if ($disk.OperationalStatus -ne 'Online') {",
@@ -79,13 +79,16 @@ resource "aws_ssm_document" "format_data_disks" {
             "      if ($disk.PartitionStyle -eq 'RAW') {",
             "        $partition = Initialize-Disk -Number $disk.Number -PartitionStyle MBR -PassThru |",
             "                     New-Partition -UseMaximumSize -AssignDriveLetter",
-            "        Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel 'sree' -Force -Confirm:$false",
+            "        $volume = Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel 'sree' -Force -Confirm:$false",
+            "        $driveLetter = $volume.DriveLetter",
+            "        $folderPath = \"$driveLetter:\\SQLData\"",
+            "        New-Item -Path $folderPath -ItemType Directory -Force | Out-Null",
             "      }",
             "    }",
-            "    'Data disks processed successfully.' | Out-File 'C:\\Temp\\disk_format_log.txt'",
+            "    'Data disks processed successfully.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
             "  }",
             "} catch {",
-            "  'Error during disk processing: ' + $_ | Out-File 'C:\\Temp\\disk_format_error_log.txt'",
+            "  'Error during disk processing: ' + $_ | Out-File 'C:\\Windows\\Temp\\disk_format_error_log.txt'",
             "}"
           ]
         }
