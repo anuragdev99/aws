@@ -58,21 +58,30 @@ resource "aws_ssm_document" "format_data_disks" {
 
   content = jsonencode({
     schemaVersion = "2.2",
-    description   = "Format newly attached disks on Windows",
+    description   = "Format and label disks, create SQLData folder",
     mainSteps     = [
       {
         action = "aws:runPowerShellScript",
-        name   = "formatRawDisks",
+        name   = "formatDisks",
         inputs = {
           runCommand = [
             "try {",
-            "  $rawDisks = Get-Disk | Where-Object PartitionStyle -Eq 'RAW'",
-            "  foreach ($disk in $rawDisks) {",
-            "    $partition = Initialize-Disk -Number $disk.Number -PartitionStyle MBR -PassThru |",
-            "                 New-Partition -UseMaximumSize -AssignDriveLetter",
-            "    Format-Volume -Partition $partition -FileSystem NTFS -Force -Confirm:$false",
+            "  $disks = Get-Disk | Where-Object IsSystem -eq $false | Where-Object OperationalStatus -eq 'Online'",
+            "  foreach ($disk in $disks) {",
+            "    if ($disk.PartitionStyle -eq 'RAW') {",
+            "      $partition = Initialize-Disk -Number $disk.Number -PartitionStyle MBR -PassThru |",
+            "        New-Partition -UseMaximumSize -AssignDriveLetter",
+            "      $driveLetter = ($partition | Get-Volume).DriveLetter",
+            "    } else {",
+            "      $driveLetter = ($disk | Get-Partition | Get-Volume).DriveLetter",
+            "    }",
+            "    $volume = Get-Volume -DriveLetter $driveLetter",
+            "    if ($volume.FileSystem -ne 'NTFS') {",
+            "      Format-Volume -DriveLetter $driveLetter -FileSystem NTFS -NewFileSystemLabel 'sree' -Force -Confirm:$false",
+            "    }",
+            "    New-Item -Path \"$($driveLetter):\\SQLData\" -ItemType Directory -Force",
             "  }",
-            "  'Disk formatting complete.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
+            "  'Disks formatted and SQLData folders created.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
             "} catch {",
             "  'Disk formatting failed: ' + $_ | Out-File 'C:\\Windows\\Temp\\disk_format_error_log.txt'",
             "}"
