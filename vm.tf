@@ -94,6 +94,41 @@ resource "aws_ssm_document" "format_data_disks" {
   })
 }
 
+resource "aws_ssm_document" "create_sql_data_folder" {
+  name          = "CreateSQLDataFolder"
+  document_type = "Command"
+
+  content = jsonencode({
+    schemaVersion = "2.2",
+    description   = "Create SQLData folder in each data disk",
+    mainSteps     = [
+      {
+        action = "aws:runPowerShellScript",
+        name   = "CreateFolder",
+        inputs = {
+          runCommand = [
+            "try {",
+            "  $dataDisks = Get-Disk | Where-Object IsSystem -eq $false",
+            "  foreach ($disk in $dataDisks) {",
+            "    $volumes = Get-Volume -DiskNumber $disk.Number | Where-Object DriveLetter -ne $null",
+            "    foreach ($volume in $volumes) {",
+            "      $folderPath = \"$($volume.DriveLetter):\\SQLData\"",
+            "      if (-not (Test-Path $folderPath)) {",
+            "        New-Item -Path $folderPath -ItemType Directory -Force | Out-Null",
+            "      }",
+            "    }",
+            "  }",
+            "  'SQLData folders created successfully.' | Out-File 'C:\\Windows\\Temp\\sql_data_folder_log.txt'",
+            "} catch {",
+            "  'Error creating SQLData folders: ' + $_ | Out-File 'C:\\Windows\\Temp\\sql_data_folder_error_log.txt'",
+            "}"
+          ]
+        }
+      }
+    ]
+  })
+}
+
 resource "aws_ssm_association" "format_disks" {
   name = aws_ssm_document.format_data_disks.name
 
