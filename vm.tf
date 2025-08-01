@@ -104,23 +104,33 @@ resource "aws_ssm_document" "create_sql_data_folder" {
     mainSteps     = [
       {
         action = "aws:runPowerShellScript",
-        name   = "CreateFolder",
+        name   = "CreateSQLFolder",
         inputs = {
           runCommand = [
+            "$ErrorActionPreference = 'Stop'",  // Make all errors terminating
             "try {",
+            "  $logPath = 'C:\\Temp\\sql_data_folder_log.txt'",
+            "  $errorPath = 'C:\\Temp\\sql_data_folder_error_log.txt'",
+            "  if (-not (Test-Path 'C:\\Temp')) { New-Item -Path 'C:\\Temp' -ItemType Directory -Force }",
+            "  Start-Sleep -Seconds 20",
             "  $dataDisks = Get-Disk | Where-Object IsSystem -eq $false",
             "  foreach ($disk in $dataDisks) {",
-            "    $volumes = Get-Volume -DiskNumber $disk.Number | Where-Object DriveLetter -ne $null",
+            "    $volumes = Get-Volume -DiskNumber $disk.Number | Where-Object { $_.DriveLetter -ne $null -and $_.FileSystem -ne $null }",
             "    foreach ($volume in $volumes) {",
             "      $folderPath = \"$($volume.DriveLetter):\\SQLData\"",
             "      if (-not (Test-Path $folderPath)) {",
             "        New-Item -Path $folderPath -ItemType Directory -Force | Out-Null",
+            "        \"Created folder at $folderPath\" | Out-File -Append $logPath",
+            "        Write-Output \"Created folder at $folderPath\"",
+            "      } else {",
+            "        \"Folder already exists at $folderPath\" | Out-File -Append $logPath",
+            "        Write-Output \"Folder already exists at $folderPath\"",
             "      }",
             "    }",
             "  }",
-            "  'SQLData folders created successfully.' | Out-File 'C:\\Windows\\Temp\\sql_data_folder_log.txt'",
             "} catch {",
-            "  'Error creating SQLData folders: ' + $_ | Out-File 'C:\\Windows\\Temp\\sql_data_folder_error_log.txt'",
+            "  $_ | Out-File $errorPath",
+            "  Write-Output \"Error: $_\"",
             "}"
           ]
         }
