@@ -70,7 +70,6 @@ resource "aws_volume_attachment" "attach" {
   instance_id  = aws_instance.vm1.id
   force_detach = true
 
- depends_on = [aws_instance.vm1]
 }
 
 
@@ -81,6 +80,4 @@ resource "aws_ssm_association" "format_disks" {
     key    = "InstanceIds"
     values = [aws_instance.vm1.id]
   }
-
-  depends_on = [aws_volume_attachment.attach]
 }
