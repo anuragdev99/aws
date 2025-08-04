@@ -23,5 +23,7 @@ resource "aws_volume_attachment" "attach" {
   volume_id    = aws_ebs_volume.data_volume[count.index].id
   instance_id  = aws_instance.vm1.id
   force_detach = true
+
+ depends_on = [aws_instance.vm1]
 }
 
