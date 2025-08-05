@@ -2,7 +2,7 @@
 
 # Fetch vm1’s Availability Zone
 data "aws_instance" "vm1" {
-  instance_id = "i-0859c2c6e360f4817"
+  instance_id = aws_instance.vm1.id
 }
 
 resource "aws_ssm_document" "format_data_disks" {
@@ -68,7 +68,7 @@ resource "aws_volume_attachment" "attach" {
   count        = 2
   device_name  = "/dev/xvd${element(["f", "g"], count.index)}"
   volume_id    = aws_ebs_volume.data_volume[count.index].id
-  instance_id  = "i-0859c2c6e360f4817"
+  instance_id  = aws_instance.vm1.id
   force_detach = true
 }
 
@@ -78,6 +78,6 @@ resource "aws_ssm_association" "format_disks" {
 
   targets {
     key    = "InstanceIds"
-    values = ["i-0859c2c6e360f4817"]
+    values = [aws_instance.vm1.id]
   }
 }
