@@ -18,40 +18,24 @@ resource "aws_ssm_document" "format_data_disks" {
         name   = "PrepareDisks",
         inputs = {
           runCommand = [
-            "try {",
-            "  Start-Sleep -Seconds 30",  // Wait for disks to become visible
-            "",
-            "  # Get all non-system disks that are RAW (uninitialized) and offline",
-            "  $rawDisks = Get-Disk | Where-Object { $_.IsSystem -eq $false -and $_.PartitionStyle -eq 'RAW' }",
-            "",
-            "  if ($rawDisks.Count -eq 0) {",
-            "    'No uninitialized (RAW) data disks found.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
-            "  } else {",
-            "    foreach ($disk in $rawDisks) {",
-            "      try {",
-            "        if ($disk.OperationalStatus -ne 'Online') {",
-            "          Set-Disk -Number $disk.Number -IsOffline $false -ErrorAction Stop",
-            "          Set-Disk -Number $disk.Number -IsReadOnly $false -ErrorAction Stop",
-            "        }",
-            "",
-            "        # Initialize and format the disk",
-            "        $partition = Initialize-Disk -Number $disk.Number -PartitionStyle GPT -PassThru |",
-            "                     New-Partition -UseMaximumSize -AssignDriveLetter",
-            "        $volume = Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel 'sree' -Force -Confirm:$false",
-            "",
-            "        # Create folder on the newly formatted volume",
-            "        $driveLetter = $volume.DriveLetter",
-            "        $sqlDataPath = \"$driveLetter`:\\SQLData\"",
-            "        New-Item -Path $sqlDataPath -ItemType Directory -Force | Out-Null",
-            "",
-            "        \"Disk $($disk.Number) formatted and folder created at $sqlDataPath\" | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt' -Append",
-            "      } catch {",
-            "        \"Failed to process disk $($disk.Number): $_\" | Out-File 'C:\\Windows\\Temp\\disk_format_error_log.txt' -Append",
-            "      }",
+            "$ErrorActionPreference = 'Stop'",
+            "Start-Sleep -Seconds 30",
+            "$dataDisks = Get-Disk | Where-Object { $_.IsSystem -eq $false -and $_.PartitionStyle -eq 'RAW' }",
+            "if ($dataDisks.Count -eq 0) {",
+            "  'No uninitialized data disks found.' | Out-File 'C:\\Temp\\disk_format_log.txt'",
+            "} else {",
+            "  foreach ($disk in $dataDisks) {",
+            "    if ($disk.OperationalStatus -ne 'Online') {",
+            "      Set-Disk -Number $disk.Number -IsOffline $false",
+            "      Set-Disk -Number $disk.Number -IsReadOnly $false",
             "    }",
+            "    $partition = Initialize-Disk -Number $disk.Number -PartitionStyle MBR -PassThru |",
+            "                 New-Partition -UseMaximumSize -AssignDriveLetter",
+            "    $volume = Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel 'sree' -Force -Confirm:$false",
+            "    $sqlDataPath = \"$($volume.DriveLetter):\\SQLData\"",
+            "    New-Item -Path $sqlDataPath -ItemType Directory | Out-Null",
             "  }",
-            "} catch {",
-            "  'General error during disk processing: ' + $_ | Out-File 'C:\\Windows\\Temp\\disk_format_error_log.txt' -Append",
+            "  'Data disks processed and SQLData folders created.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
             "}"
           ]
         }
@@ -59,8 +43,6 @@ resource "aws_ssm_document" "format_data_disks" {
     ]
   })
 }
-
-
 
 
 # Create two 1 GiB GP3 volumes
