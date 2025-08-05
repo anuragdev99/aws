@@ -19,27 +19,39 @@ resource "aws_ssm_document" "format_data_disks" {
         inputs = {
           runCommand = [
             "try {",
-            "  Start-Sleep -Seconds 30",  // Wait for disks to show up
-            "  $rawDisks = Get-Disk | Where-Object { $_.PartitionStyle -eq 'RAW' -and $_.IsSystem -eq $false }",
+            "  Start-Sleep -Seconds 30",  // Wait for disks to become visible
+            "",
+            "  # Get all non-system disks that are RAW (uninitialized) and offline",
+            "  $rawDisks = Get-Disk | Where-Object { $_.IsSystem -eq $false -and $_.PartitionStyle -eq 'RAW' }",
+            "",
             "  if ($rawDisks.Count -eq 0) {",
-            "    'No unformatted RAW data disks found.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
+            "    'No uninitialized (RAW) data disks found.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
             "  } else {",
             "    foreach ($disk in $rawDisks) {",
-            "      if ($disk.OperationalStatus -ne 'Online') {",
-            "        Set-Disk -Number $disk.Number -IsOffline $false -ErrorAction Stop",
-            "        Set-Disk -Number $disk.Number -IsReadOnly $false -ErrorAction Stop",
+            "      try {",
+            "        if ($disk.OperationalStatus -ne 'Online') {",
+            "          Set-Disk -Number $disk.Number -IsOffline $false -ErrorAction Stop",
+            "          Set-Disk -Number $disk.Number -IsReadOnly $false -ErrorAction Stop",
+            "        }",
+            "",
+            "        # Initialize and format the disk",
+            "        $partition = Initialize-Disk -Number $disk.Number -PartitionStyle GPT -PassThru |",
+            "                     New-Partition -UseMaximumSize -AssignDriveLetter",
+            "        $volume = Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel 'sree' -Force -Confirm:$false",
+            "",
+            "        # Create folder on the newly formatted volume",
+            "        $driveLetter = $volume.DriveLetter",
+            "        $sqlDataPath = \"$driveLetter`:\\SQLData\"",
+            "        New-Item -Path $sqlDataPath -ItemType Directory -Force | Out-Null",
+            "",
+            "        \"Disk $($disk.Number) formatted and folder created at $sqlDataPath\" | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt' -Append",
+            "      } catch {",
+            "        \"Failed to process disk $($disk.Number): $_\" | Out-File 'C:\\Windows\\Temp\\disk_format_error_log.txt' -Append",
             "      }",
-            "      $partition = Initialize-Disk -Number $disk.Number -PartitionStyle GPT -PassThru |",
-            "                   New-Partition -UseMaximumSize -AssignDriveLetter",
-            "      $volume = Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel 'sree' -Force -Confirm:$false",
-            "      $driveLetter = $volume.DriveLetter",
-            "      $sqlDataPath = \"$driveLetter`:\\SQLData\"",
-            "      New-Item -Path $sqlDataPath -ItemType Directory -Force | Out-Null",
             "    }",
-            "    'All RAW data disks processed and folders created.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
             "  }",
             "} catch {",
-            "  'Error during disk processing: ' + $_ | Out-File 'C:\\Windows\\Temp\\disk_format_error_log.txt'",
+            "  'General error during disk processing: ' + $_ | Out-File 'C:\\Windows\\Temp\\disk_format_error_log.txt' -Append",
             "}"
           ]
         }
@@ -47,6 +59,7 @@ resource "aws_ssm_document" "format_data_disks" {
     ]
   })
 }
+
 
 
 
@@ -83,4 +96,5 @@ resource "aws_ssm_association" "format_disks" {
   triggers = {
     volumes = join(",", aws_ebs_volume.data_volume[*].id)
   }
+  depends_on = [aws_volume_attachment.attach]
 }
