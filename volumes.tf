@@ -79,4 +79,8 @@ resource "aws_ssm_association" "format_disks" {
     key    = "InstanceIds"
     values = [aws_instance.vm1.id]
   }
+
+  triggers = {
+    volumes = join(",", aws_ebs_volume.data_volume[*].id)
+  }
 }
