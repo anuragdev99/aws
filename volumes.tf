@@ -19,26 +19,24 @@ resource "aws_ssm_document" "format_data_disks" {
         inputs = {
           runCommand = [
             "try {",
-            "  Start-Sleep -Seconds 30",  // Give time for disks to initialize
-            "  $dataDisks = Get-Disk | Where-Object IsSystem -eq $false",
-            "  if ($dataDisks.Count -eq 0) {",
-            "    'No data disks found.' | Out-File 'C:\\Temp\\disk_format_log.txt'",
+            "  Start-Sleep -Seconds 30",  // Wait for disks to show up
+            "  $rawDisks = Get-Disk | Where-Object { $_.PartitionStyle -eq 'RAW' -and $_.IsSystem -eq $false }",
+            "  if ($rawDisks.Count -eq 0) {",
+            "    'No unformatted RAW data disks found.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
             "  } else {",
-            "    foreach ($disk in $dataDisks) {",
+            "    foreach ($disk in $rawDisks) {",
             "      if ($disk.OperationalStatus -ne 'Online') {",
-            "        Set-Disk -Number $disk.Number -IsOffline $false",
-            "        Set-Disk -Number $disk.Number -IsReadOnly $false",
+            "        Set-Disk -Number $disk.Number -IsOffline $false -ErrorAction Stop",
+            "        Set-Disk -Number $disk.Number -IsReadOnly $false -ErrorAction Stop",
             "      }",
-            "      if ($disk.PartitionStyle -eq 'RAW') {",
-            "        $partition = Initialize-Disk -Number $disk.Number -PartitionStyle MBR -PassThru |",
-            "                     New-Partition -UseMaximumSize -AssignDriveLetter",
-            "        $volume = Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel 'sree' -Force -Confirm:$false",
-            "        $driveLetter = $volume.DriveLetter",
-            "        $sqlDataPath = \"$driveLetter`:\\SQLData\"",
-            "        New-Item -Path $sqlDataPath -ItemType Directory | Out-Null",
-            "      }",
+            "      $partition = Initialize-Disk -Number $disk.Number -PartitionStyle GPT -PassThru |",
+            "                   New-Partition -UseMaximumSize -AssignDriveLetter",
+            "      $volume = Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel 'sree' -Force -Confirm:$false",
+            "      $driveLetter = $volume.DriveLetter",
+            "      $sqlDataPath = \"$driveLetter`:\\SQLData\"",
+            "      New-Item -Path $sqlDataPath -ItemType Directory -Force | Out-Null",
             "    }",
-            "    'Data disks processed and SQLData folders created successfully.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
+            "    'All RAW data disks processed and folders created.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
             "  }",
             "} catch {",
             "  'Error during disk processing: ' + $_ | Out-File 'C:\\Windows\\Temp\\disk_format_error_log.txt'",
@@ -49,6 +47,7 @@ resource "aws_ssm_document" "format_data_disks" {
     ]
   })
 }
+
 
 
 # Create two 1 GiB GP3 volumes
