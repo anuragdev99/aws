@@ -1,4 +1,4 @@
-
+/*
 
 # Fetch vm1’s Availability Zone
 data "aws_instance" "vm1" {
@@ -79,3 +79,4 @@ resource "aws_ssm_association" "format_disks" {
 }
 
 
+*/
