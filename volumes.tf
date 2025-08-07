@@ -67,12 +67,21 @@ resource "aws_volume_attachment" "attach" {
 }
 
 
-resource "aws_ssm_association" "format_disks" {
-  name = aws_ssm_document.format_data_disks.name
+resource "null_resource" "format_data_disks_runner" {
+  triggers = {
+    volume_ids  = join(",", aws_ebs_volume.data_volume[*].id)
+    instance_id = aws_instance.vm1.id
+  }
 
-  targets {
-    key    = "InstanceIds"
-    values = [aws_instance.vm1.id]
+  provisioner "local-exec" {
+    command = <<EOT
+aws ssm send-command \
+  --document-name "FormatDataDisks" \
+  --targets "Key=InstanceIds,Values=${aws_instance.vm1.id}" \
+  --comment "Trigger disk formatting via SSM" \
+  --region us-east-1 \
+  --output text
+EOT
   }
 
   depends_on = [aws_volume_attachment.attach]
