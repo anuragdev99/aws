@@ -1,0 +1,98 @@
+
+
+# Fetch vm1’s Availability Zone
+data "aws_instance" "vm1" {
+  instance_id = aws_instance.vm1.id
+}
+
+
+resource "aws_ssm_document" "format_data_disks" {
+  name          = "FormatDataDisks"
+  document_type = "Command"
+
+  content = jsonencode({
+    schemaVersion = "2.2",
+    description   = "Format and prepare attached data disks, then create SQLData folders",
+    mainSteps     = [
+      # Step 1: Format Disks
+      {
+        action = "aws:runPowerShellScript",
+        name   = "PrepareDisks",
+        inputs = {
+          runCommand = [
+            "$ErrorActionPreference = 'Stop'",
+            "Start-Sleep -Seconds 30",
+            "$dataDisks = Get-Disk | Where-Object { $_.IsSystem -eq $false -and $_.PartitionStyle -eq 'RAW' }",
+            "if ($dataDisks.Count -eq 0) {",
+            "  'No uninitialized data disks found.' | Out-File 'C:\\Temp\\disk_format_log.txt'",
+            "} else {",
+            "  foreach ($disk in $dataDisks) {",
+            "    if ($disk.OperationalStatus -ne 'Online') {",
+            "      Set-Disk -Number $disk.Number -IsOffline $false",
+            "      Set-Disk -Number $disk.Number -IsReadOnly $false",
+            "    }",
+            "    $partition = Initialize-Disk -Number $disk.Number -PartitionStyle MBR -PassThru |",
+            "                 New-Partition -UseMaximumSize -AssignDriveLetter",
+            "    $null = Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel 'sree' -Force -Confirm:$false",
+            "  }",
+            "  'Data disks initialized and formatted.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
+            "}"
+          ]
+        }
+      },
+      # Step 2: Wait and Create SQLData Folders
+      {
+        action = "aws:runPowerShellScript",
+        name   = "CreateSQLDataFolders",
+        inputs = {
+          runCommand = [
+            "Start-Sleep -Seconds 30",
+            "$dataVolumes = Get-Volume | Where-Object { $_.FileSystemLabel -eq 'sree' }",
+            "foreach ($vol in $dataVolumes) {",
+            "  $sqlDataPath = \"$($vol.DriveLetter):\\SQLData\"",
+            "  if (-not (Test-Path $sqlDataPath)) {",
+            "    New-Item -Path $sqlDataPath -ItemType Directory | Out-Null",
+            "  }",
+            "}",
+            "'SQLData folders created on all formatted volumes.' | Out-File 'C:\\Windows\\Temp\\sql_data_folder_log.txt'"
+          ]
+        }
+      }
+    ]
+  })
+}
+
+
+# Create two 1 GiB GP3 volumes
+resource "aws_ebs_volume" "data_volume" {
+  count             = 2
+  availability_zone = data.aws_instance.vm1.availability_zone
+  size              = 1
+  type              = "gp3"
+
+  tags = {
+    Name = "my-vm1-data-${count.index + 1}"
+  }
+}
+
+# Attach volumes as /dev/xvdf and /dev/xvdg
+resource "aws_volume_attachment" "attach" {
+  count        = 2
+  device_name  = "/dev/xvd${element(["f", "g"], count.index)}"
+  volume_id    = aws_ebs_volume.data_volume[count.index].id
+  instance_id  = aws_instance.vm1.id
+  force_detach = true
+}
+
+
+
+
+resource "aws_ssm_association" "format_disks" {
+  name = aws_ssm_document.format_data_disks.name
+
+  targets {
+    key    = "InstanceIds"
+    values = [aws_instance.vm1.id]
+	}
+  depends_on = [aws_volume_attachment.attach]
+}
