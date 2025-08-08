@@ -71,7 +71,7 @@ resource "aws_ebs_volume" "data_volume" {
 
 resource "aws_volume_attachment" "attach" {
   count        = 2
-  device_name  = "/dev/xv${element(["f", "g"], count.index)}"
+  device_name  = "/dev/xvd${element(["f", "g"], count.index)}"
   volume_id    = aws_ebs_volume.data_volume[count.index].id
   instance_id  = aws_instance.vm1.id
   force_detach = true
