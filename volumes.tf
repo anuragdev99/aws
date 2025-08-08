@@ -1,10 +1,7 @@
-
-
 # Fetch vm1’s Availability Zone
 data "aws_instance" "vm1" {
   instance_id = aws_instance.vm1.id
 }
-
 
 resource "aws_ssm_document" "format_data_disks" {
   name          = "FormatDataDisks"
@@ -14,7 +11,6 @@ resource "aws_ssm_document" "format_data_disks" {
     schemaVersion = "2.2",
     description   = "Format and prepare attached data disks, then create SQLData folders",
     mainSteps     = [
-      # Step 1: Format Disks
       {
         action = "aws:runPowerShellScript",
         name   = "PrepareDisks",
@@ -24,7 +20,7 @@ resource "aws_ssm_document" "format_data_disks" {
             "Start-Sleep -Seconds 30",
             "$dataDisks = Get-Disk | Where-Object { $_.IsSystem -eq $false -and $_.PartitionStyle -eq 'RAW' }",
             "if ($dataDisks.Count -eq 0) {",
-            "  'No uninitialized data disks found.' | Out-File 'C:\\Temp\\disk_format_log.txt'",
+            "  'No uninitialized data disks found.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
             "} else {",
             "  foreach ($disk in $dataDisks) {",
             "    if ($disk.OperationalStatus -ne 'Online') {",
@@ -40,7 +36,6 @@ resource "aws_ssm_document" "format_data_disks" {
           ]
         }
       },
-      # Step 2: Wait and Create SQLData Folders
       {
         action = "aws:runPowerShellScript",
         name   = "CreateSQLDataFolders",
@@ -62,8 +57,6 @@ resource "aws_ssm_document" "format_data_disks" {
   })
 }
 
-
-# Create two 1 GiB GP3 volumes
 resource "aws_ebs_volume" "data_volume" {
   count             = 2
   availability_zone = data.aws_instance.vm1.availability_zone
@@ -75,17 +68,13 @@ resource "aws_ebs_volume" "data_volume" {
   }
 }
 
-# Attach volumes as /dev/xvdf and /dev/xvdg
 resource "aws_volume_attachment" "attach" {
   count        = 2
-  device_name  = "/dev/xvd${element(["f", "g"], count.index)}"
+  device_name  = "/dev/xv${element(["f", "g"], count.index)}"
   volume_id    = aws_ebs_volume.data_volume[count.index].id
   instance_id  = aws_instance.vm1.id
   force_detach = true
 }
-
-
-
 
 resource "aws_ssm_association" "format_disks" {
   name = aws_ssm_document.format_data_disks.name
@@ -93,6 +82,7 @@ resource "aws_ssm_association" "format_disks" {
   targets {
     key    = "InstanceIds"
     values = [aws_instance.vm1.id]
-	}
+  }
+
   depends_on = [aws_volume_attachment.attach]
 }
