@@ -10,7 +10,7 @@ resource "aws_ssm_document" "format_data_disks" {
 
   content = jsonencode({
     schemaVersion = "2.2",
-    description   = "Format and prepare attached data disks, then create SQLData folders",
+    description   = "Clear, format and prepare attached data disks, then create SQLData folders",
     mainSteps     = [
       {
         action = "aws:runPowerShellScript",
@@ -19,20 +19,28 @@ resource "aws_ssm_document" "format_data_disks" {
           runCommand = [
             "$ErrorActionPreference = 'Stop'",
             "Start-Sleep -Seconds 30",
-            "$dataDisks = Get-Disk | Where-Object { $_.IsSystem -eq $false -and $_.PartitionStyle -eq 'RAW' }",
+
+            "# Get all non-system disks",
+            "$dataDisks = Get-Disk | Where-Object { $_.IsSystem -eq $false }",
+
             "if ($dataDisks.Count -eq 0) {",
-            "  'No uninitialized data disks found.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
+            "  'No data disks found.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
             "} else {",
             "  foreach ($disk in $dataDisks) {",
             "    if ($disk.OperationalStatus -ne 'Online') {",
             "      Set-Disk -Number $disk.Number -IsOffline $false",
             "      Set-Disk -Number $disk.Number -IsReadOnly $false",
             "    }",
+
+            "    # Clear any existing partition table",
+            "    Clear-Disk -Number $disk.Number -RemoveData -Confirm:$false",
+
+            "    # Initialize as MBR and format",
             "    $partition = Initialize-Disk -Number $disk.Number -PartitionStyle MBR -PassThru |",
             "                 New-Partition -UseMaximumSize -AssignDriveLetter",
             "    $null = Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel 'sree' -Force -Confirm:$false",
             "  }",
-            "  'Data disks initialized and formatted.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
+            "  'Data disks cleared, initialized, and formatted.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
             "}"
           ]
         }
@@ -57,6 +65,7 @@ resource "aws_ssm_document" "format_data_disks" {
     ]
   })
 }
+
 
 resource "aws_ebs_volume" "data_volume" {
   count             = 2
