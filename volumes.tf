@@ -10,7 +10,7 @@ resource "aws_ssm_document" "format_data_disks" {
 
   content = jsonencode({
     schemaVersion = "2.2",
-    description   = "Clear, format and prepare attached data disks, then create SQLData folders",
+    description   = "Format and prepare attached data disks",
     mainSteps     = [
       {
         action = "aws:runPowerShellScript",
@@ -19,46 +19,23 @@ resource "aws_ssm_document" "format_data_disks" {
           runCommand = [
             "$ErrorActionPreference = 'Stop'",
             "Start-Sleep -Seconds 30",
-
-            "# Get all non-system disks",
-            "$dataDisks = Get-Disk | Where-Object { $_.IsSystem -eq $false }",
-
+            "$dataDisks = Get-Disk | Where-Object { $_.IsSystem -eq $false -and $_.PartitionStyle -eq 'RAW' }",
             "if ($dataDisks.Count -eq 0) {",
-            "  'No data disks found.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
+            "  'No uninitialized data disks found.' | Out-File 'C:\\Temp\\disk_format_log.txt'",
             "} else {",
             "  foreach ($disk in $dataDisks) {",
             "    if ($disk.OperationalStatus -ne 'Online') {",
             "      Set-Disk -Number $disk.Number -IsOffline $false",
             "      Set-Disk -Number $disk.Number -IsReadOnly $false",
             "    }",
-
-            "    # Always clear disk before formatting",
-            "    Clear-Disk -Number $disk.Number -RemoveData -Confirm:$false",
-
-            "    # Initialize as MBR and format",
             "    $partition = Initialize-Disk -Number $disk.Number -PartitionStyle MBR -PassThru |",
             "                 New-Partition -UseMaximumSize -AssignDriveLetter",
-            "    $null = Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel 'sree' -Force -Confirm:$false",
-            "  }",
-            "  'Data disks cleared, initialized, and formatted.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
-            "}"
-          ]
-        }
-      },
-      {
-        action = "aws:runPowerShellScript",
-        name   = "CreateSQLDataFolders",
-        inputs = {
-          runCommand = [
-            "Start-Sleep -Seconds 30",
-            "$dataVolumes = Get-Volume | Where-Object { $_.FileSystemLabel -eq 'sree' }",
-            "foreach ($vol in $dataVolumes) {",
-            "  $sqlDataPath = \"$($vol.DriveLetter):\\SQLData\"",
-            "  if (-not (Test-Path $sqlDataPath)) {",
+            "    $volume = Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel 'sree' -Force -Confirm:$false",
+            "    $sqlDataPath = \"$($volume.DriveLetter):\\SQLData\"",
             "    New-Item -Path $sqlDataPath -ItemType Directory | Out-Null",
             "  }",
-            "}",
-            "'SQLData folders created on all formatted volumes.' | Out-File 'C:\\Windows\\Temp\\sql_data_folder_log.txt'"
+            "  'Data disks processed and SQLData folders created.' | Out-File 'C:\\Windows\\Temp\\disk_format_log.txt'",
+            "}"
           ]
         }
       }
@@ -66,7 +43,8 @@ resource "aws_ssm_document" "format_data_disks" {
   })
 }
 
-# Create 2 data volumes for VM1
+
+# Create two 1 GiB GP3 volumes
 resource "aws_ebs_volume" "data_volume" {
   count             = 2
   availability_zone = data.aws_instance.vm1.availability_zone
@@ -78,7 +56,7 @@ resource "aws_ebs_volume" "data_volume" {
   }
 }
 
-# Attach data volumes to VM1
+# Attach volumes as /dev/xvdf and /dev/xvdg
 resource "aws_volume_attachment" "attach" {
   count        = 2
   device_name  = "/dev/xvd${element(["f", "g"], count.index)}"
@@ -87,13 +65,22 @@ resource "aws_volume_attachment" "attach" {
   force_detach = true
 }
 
-# Run disk preparation SSM document on VM1 after attachment
-resource "aws_ssm_association" "format_disks" {
-  name = aws_ssm_document.format_data_disks.name
 
-  targets {
-    key    = "InstanceIds"
-    values = [aws_instance.vm1.id]
+resource "null_resource" "format_data_disks_runner" {
+  triggers = {
+    volume_ids  = join(",", aws_ebs_volume.data_volume[*].id)
+    instance_id = aws_instance.vm1.id
+  }
+
+  provisioner "local-exec" {
+    command = <<EOT
+aws ssm send-command \
+  --document-name "FormatDataDisks" \
+  --targets "Key=InstanceIds,Values=${aws_instance.vm1.id}" \
+  --comment "Trigger disk formatting via SSM" \
+  --region us-east-1 \
+  --output text
+EOT
   }
 
   depends_on = [aws_volume_attachment.attach]
