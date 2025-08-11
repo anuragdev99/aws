@@ -32,7 +32,7 @@ resource "aws_ssm_document" "format_data_disks" {
             "      Set-Disk -Number $disk.Number -IsReadOnly $false",
             "    }",
 
-            "    # Clear any existing partition table",
+            "    # Always clear disk before formatting",
             "    Clear-Disk -Number $disk.Number -RemoveData -Confirm:$false",
 
             "    # Initialize as MBR and format",
@@ -66,7 +66,7 @@ resource "aws_ssm_document" "format_data_disks" {
   })
 }
 
-
+# Create 2 data volumes for VM1
 resource "aws_ebs_volume" "data_volume" {
   count             = 2
   availability_zone = data.aws_instance.vm1.availability_zone
@@ -78,6 +78,7 @@ resource "aws_ebs_volume" "data_volume" {
   }
 }
 
+# Attach data volumes to VM1
 resource "aws_volume_attachment" "attach" {
   count        = 2
   device_name  = "/dev/xvd${element(["f", "g"], count.index)}"
@@ -86,6 +87,7 @@ resource "aws_volume_attachment" "attach" {
   force_detach = true
 }
 
+# Run disk preparation SSM document on VM1 after attachment
 resource "aws_ssm_association" "format_disks" {
   name = aws_ssm_document.format_data_disks.name
 
@@ -96,5 +98,3 @@ resource "aws_ssm_association" "format_disks" {
 
   depends_on = [aws_volume_attachment.attach]
 }
-
-
