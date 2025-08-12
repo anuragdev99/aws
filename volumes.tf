@@ -66,15 +66,12 @@ resource "aws_volume_attachment" "attach" {
 
 # Trigger SSM command after volume attachment
 resource "aws_ssm_association" "run_format_disks" {
-  name       = aws_ssm_document.format_data_disks.name
-  targets = [
-    {
-      key    = "InstanceIds"
-      values = [aws_instance.vm1.id]
-    }
-  ]
+  name = "FormatDataDisks"
 
-  depends_on = [
-    aws_volume_attachment.attach
-  ]
+  targets {
+    key    = "InstanceIds"
+    values = [aws_instance.vm1.id]
+  }
+
+  depends_on = [aws_volume_attachment.attach]
 }
