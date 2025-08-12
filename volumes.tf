@@ -1,9 +1,9 @@
-
 # Fetch vm1’s Availability Zone
 data "aws_instance" "vm1" {
   instance_id = aws_instance.vm1.id
 }
 
+# SSM Document to format disks
 resource "aws_ssm_document" "format_data_disks" {
   name          = "FormatDataDisks"
   document_type = "Command"
@@ -19,7 +19,7 @@ resource "aws_ssm_document" "format_data_disks" {
           runCommand = [
             "$ErrorActionPreference = 'Stop'",
             "Start-Sleep -Seconds 30",
-            "$dataDisks = Get-Disk | Where-Object { $_.IsSystem -eq $false -and $_.PartitionStyle -eq 'RAW' }",
+            "$dataDisks = Get-Disk | Where-Object { $_.IsSystem -eq $false -and ($_.PartitionStyle -eq 'RAW' -or $_.PartitionStyle -eq 'MBR') }",
             "if ($dataDisks.Count -eq 0) {",
             "  'No uninitialized data disks found.' | Out-File 'C:\\Temp\\disk_format_log.txt'",
             "} else {",
@@ -43,7 +43,6 @@ resource "aws_ssm_document" "format_data_disks" {
   })
 }
 
-
 # Create two 1 GiB GP3 volumes
 resource "aws_ebs_volume" "data_volume" {
   count             = 2
@@ -65,37 +64,17 @@ resource "aws_volume_attachment" "attach" {
   force_detach = true
 }
 
-
-resource "null_resource" "wait_for_ssm" {
-  provisioner "local-exec" {
-    command = <<EOT
-      for i in {1..20}; do
-        aws ssm describe-instance-information \
-          --region us-east-1 \
-          --filters "Key=InstanceIds,Values=${aws_instance.vm1.id}" \
-          --query "InstanceInformationList[*].PingStatus" \
-          --output text | grep -q "Online" && break
-        echo "Waiting for SSM to be ready..."
-        sleep 15
-      done
-    EOT
-  }
-}
-
-resource "null_resource" "format_data_disks_runner" {
-  depends_on = [
-    aws_volume_attachment.attach,
-    null_resource.wait_for_ssm
+# Trigger SSM command after volume attachment
+resource "aws_ssm_association" "run_format_disks" {
+  name       = aws_ssm_document.format_data_disks.name
+  targets = [
+    {
+      key    = "InstanceIds"
+      values = [aws_instance.vm1.id]
+    }
   ]
 
-  provisioner "local-exec" {
-    command = <<EOT
-      aws ssm send-command \
-        --document-name "FormatDataDisks" \
-        --targets "Key=InstanceIds,Values=${aws_instance.vm1.id}" \
-        --comment "Trigger disk formatting via SSM" \
-        --region us-east-1 \
-        --output text
-    EOT
-  }
+  depends_on = [
+    aws_volume_attachment.attach
+  ]
 }
