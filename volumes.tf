@@ -66,22 +66,36 @@ resource "aws_volume_attachment" "attach" {
 }
 
 
-resource "null_resource" "format_data_disks_runner" {
-  triggers = {
-    volume_ids  = join(",", aws_ebs_volume.data_volume[*].id)
-    instance_id = aws_instance.vm1.id
+resource "null_resource" "wait_for_ssm" {
+  provisioner "local-exec" {
+    command = <<EOT
+      for i in {1..20}; do
+        aws ssm describe-instance-information \
+          --region us-east-1 \
+          --filters "Key=InstanceIds,Values=${aws_instance.vm1.id}" \
+          --query "InstanceInformationList[*].PingStatus" \
+          --output text | grep -q "Online" && break
+        echo "Waiting for SSM to be ready..."
+        sleep 15
+      done
+    EOT
   }
+}
+
+resource "null_resource" "format_data_disks_runner" {
+  depends_on = [
+    aws_volume_attachment.attach,
+    null_resource.wait_for_ssm
+  ]
 
   provisioner "local-exec" {
     command = <<EOT
-aws ssm send-command \
-  --document-name "FormatDataDisks" \
-  --targets "Key=InstanceIds,Values=${aws_instance.vm1.id}" \
-  --comment "Trigger disk formatting via SSM" \
-  --region us-east-1 \
-  --output text
-EOT
+      aws ssm send-command \
+        --document-name "FormatDataDisks" \
+        --targets "Key=InstanceIds,Values=${aws_instance.vm1.id}" \
+        --comment "Trigger disk formatting via SSM" \
+        --region us-east-1 \
+        --output text
+    EOT
   }
-
-  depends_on = [aws_volume_attachment.attach]
 }
